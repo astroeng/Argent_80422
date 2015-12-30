@@ -1,62 +1,6 @@
 #include <argent_80422.h>
 #include <Arduino.h>
 
-/* The wind direction indicatior uses 8 resistor reed switch pairs
- * this along with a 10k ohm resistor tied to 5 volts will produce 
- * the voltages in this table. This table is in hundreths of a volt.
- */
-
-//int voltage_map[] = {32,  // 112.5   [65]
-//                     41,  // 67.5    [84]
-//                     45,  // 90      [92]
-//                     62,  // 157.5   [127]
-//                     90,  // 135     [184]
-//                     119,  // 202.5  [243]
-//                     140,  // 180    [286]
-//                     198,  // 22.5   [405]
-//                     225,  // 45     [460]
-//                     293,  // 247.5  [600]
-//                     308,  // 225    [631]
-//                     343,  // 337.5  [702]
-//                     384,  // 0      [788]
-//                     404,  // 292.5  [827]
-//                     432,  // 315  //478???  [884] [979]
-//                     462}; // 270    [946]
-
-/* Adjusted to be the midpoint between two readings. */
-const int voltage_map[] = {37,  // 112.5   [65]
-	                       43,  // 67.5    [84]
-	                       53,  // 90      [92]
-	                       76,  // 157.5   [127]
-						   104,  // 135     [184]
-						   129,  // 202.5  [243]
-						   169,  // 180    [286]
-                           211,  // 22.5   [405]
-						   259,  // 45     [460]
-						   300,  // 247.5  [600]
-						   325,  // 225    [631]
-						   363,  // 337.5  [702]
-						   394,  // 0      [788]
-						   418,  // 292.5  [827]
-						   447,  // 315  //478???  [884] [979]
-						   472}; // 270    [946]
-						   
-const int degree_map[] = {1125,
-	                       675,
-						   900,
-						  1575,
-						  1350,
-						  2025,
-						  1800,
-						   225,
-						   450,
-						  2475,
-						  2250,
-						  3375,
-                             0,
-						  2925,
-						  3150,
-						  2700};
 
 #define RPMillis_to_MPH 1492
 #define MILLIS_to_HOURS 1000 * 60 * 60
@@ -129,11 +73,18 @@ void Argent_80422::rainFall_ISR()
 unsigned int Argent_80422::getWindDirection()
 {
     long value = ((long)analogRead(_direction_pin) * 500l) / 1024l;
+	
+    /* The wind direction indicatior uses 8 resistor reed switch pairs
+     * this along with a 10k ohm resistor tied to 5 volts will produce 
+     * the voltages in this table. This table is in hundreths of a volt.
+     */
 
 	/* Making this a jump table vs a loop with a lookup array
 	 * will cause the compiler to put this in program memory
 	 * instead of dynamic memory.
 	 */
+
+	/* Voltage (in hundreths) return Degrees (in tenths) */
 	if (value < 37) return 1125;
 	if (value < 43) return 675;
 	if (value < 53) return 900;
