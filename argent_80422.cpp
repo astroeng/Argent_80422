@@ -1,12 +1,33 @@
+/* Derek Schacht
+ *  2016 01 07
+ *  License : Give me credit where it is due. 
+ *  Disclamer : I try and site code that I find on the internet but I am not perfect. If you find 
+ *              something that should be sited let me know and I will update my code.
+ *  Warranty : Absolutly None
+ *  
+ *  This header also applies to all previous commits. But, I reserve the right to modify this in the future.
+ */
+
 #include <argent_80422.h>
 #include <Arduino.h>
 
 
-#define RPMillis_to_MPH 1492
+#define RPMillis_to_MPH 1492000l
 #define MILLIS_to_HOURS 1000 * 60 * 60
 
+long timeAge(long time_reference, long time_in_question)
+{
+	if (time_reference >= time_in_question)
+	{
+		return (time_reference - time_in_question);
+	}
+	else
+	{
+		return (0xffffffff - time_in_question + time_reference);
+	}
+}
 
-/* Setup for the argent_80422 anamometer, wind direction, 
+/* Setup for the argent_80422 anemometer, wind direction, 
  * and rain guage gizmo. This class handles all three 
  * functions.
  */
@@ -26,9 +47,10 @@ void Argent_80422::begin()
 	pinMode(_anemometer_pin, INPUT_PULLUP);
 	pinMode(_bucket_pin, INPUT_PULLUP);
 	pinMode(_direction_pin, INPUT);
-	
-	windSpeedElapsed = 1;
+
 	windSpeedEpoch = millis();
+	windSpeedTally = 0;
+	windSpeedCount = 0;
 	
 	rainFallCount = 0;
 	rainFallEpoch = millis();
@@ -36,24 +58,53 @@ void Argent_80422::begin()
 }
 
 /* This function is intended to be called when the reed switch 
- * for the anamometer sends a pulse. The best use is to call 
+ * for the anemometer sends a pulse. The best use is to call 
  * this function from an ISR that handles the other ISR duties.
  * High speed polling could be used to but pulses will be missed
  * if the code is not super simple.
  */ 
 
+unsigned long windSpeedTally_ISR;
+unsigned long windSpeedCount_ISR;
+
+#define WINDSPEED_COUNT_LIMIT 4
+#define WINDSPEED_COUNT_BOTTOM 0
+
 void Argent_80422::windSpeed_ISR()
 {
-	if (millis() >= windSpeedEpoch)
+	unsigned long windSpeedElapsed;
+	
+	windSpeedElapsed = timeAge(micros(),windSpeedEpoch);
+	
+	if (windSpeedCount_ISR < WINDSPEED_COUNT_LIMIT && 
+		windSpeedCount_ISR >= WINDSPEED_COUNT_BOTTOM)
 	{
-		windSpeedElapsed = millis() - windSpeedEpoch;
+		/* Accumulate the interval that the anemometer takes to rotate.
+		 * This combined with the number of rotations will give wind
+		 * speed.
+		 */
+		windSpeedTally_ISR += windSpeedElapsed;
+	}
+	else if (windSpeedCount_ISR == WINDSPEED_COUNT_LIMIT)
+	{
+		/* Copy over the data and reset the internal stuff. 
+		 */
+		windSpeedTally = windSpeedTally_ISR;
+		windSpeedCount = windSpeedCount_ISR;
+		windSpeedTally_ISR = windSpeedElapsed;
+		windSpeedCount_ISR = WINDSPEED_COUNT_BOTTOM;
+		
 	}
 	else
 	{
-		windSpeedElapsed = 0xffffffff - windSpeedEpoch + millis();
+		// Something is horribly wrong.... reset the counters and pray.
+		windSpeedTally_ISR = 0;
+		windSpeedCount_ISR = WINDSPEED_COUNT_BOTTOM;
 	}
-		
-	windSpeedEpoch = millis();
+	
+	windSpeedCount_ISR++;
+	
+	windSpeedEpoch = micros();
 }
 
 /* This function is intended to be called when the reed switch 
@@ -105,11 +156,30 @@ unsigned int Argent_80422::getWindDirection()
 	return 9999;
 }
 
-/* Returns windspeed in tenths of a MPH */
+
+/* Returns windspeed in hundreths of a MPH */
 
 unsigned int Argent_80422::getWindSpeed()
 {
-	return (RPMillis_to_MPH * 10) / windSpeedElapsed;
+	/* Set this to an arbitrarily large number. This
+	 * will make the windSpeed basically zero if the 
+	 * anemometer is not spinning.
+	 */
+
+	unsigned long averageWindSpeedElapsed = 0xffffffff;
+	
+	/* Check to make sure a windspeed is present and isn't very old.
+	 * Basically assume a zero (0) windspeed if it is older than 30
+	 * seconds since that implies that the anemometer is barely rotating.
+	 * This equates to a wind speed of less than 0.05 mph.
+	 */
+
+	if ((windSpeedCount > 0) && timeAge(micros(), windSpeedEpoch) < 30000000)
+	{
+		averageWindSpeedElapsed = windSpeedTally / windSpeedCount;
+	}
+
+	return (RPMillis_to_MPH * 100l) / averageWindSpeedElapsed;
 }
 
 /* Returns the amount of rain fallen since the last reset in
@@ -126,17 +196,8 @@ unsigned int Argent_80422::getRainFall()
  */
 
 unsigned int Argent_80422::getRainFallElapsed()
-{
-	unsigned long timeValue = millis();
-	
-	if (timeValue > rainFallEpoch)
-	{
-		return (timeValue - rainFallEpoch) / MILLIS_to_HOURS;
-	}
-	else
-	{
-		return (0xffffffff - rainFallEpoch + timeValue) / MILLIS_to_HOURS;
-	}
+{	
+	return timeAge(millis(), rainFallEpoch) / MILLIS_to_HOURS;
 }
 
 /* Function used to reset the rain fall accumulation.
