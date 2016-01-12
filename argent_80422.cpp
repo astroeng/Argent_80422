@@ -53,7 +53,6 @@ void Argent_80422::begin()
 	windSpeedCount = 0;
 	
 	rainFallCount = 0;
-	rainFallEpoch = millis();
 	
 }
 
@@ -191,21 +190,11 @@ unsigned int Argent_80422::getRainFall()
 	return rainFallCount * 11;
 }
 
-/* Returns the duration of the rain fallen accumulation since
- * the last reset in hours.
- */
-
-unsigned int Argent_80422::getRainFallElapsed()
-{	
-	return timeAge(millis(), rainFallEpoch) / MILLIS_to_HOURS;
-}
-
 /* Function used to reset the rain fall accumulation.
  */
 
 void Argent_80422::resetRainFall()
 {
 	rainFallCount = 0;
-	rainFallEpoch = millis();
 }
 	

@@ -25,7 +25,6 @@ public:
 	unsigned int getWindDirection();   /* Wind direction in tenths of a degree. */
 	unsigned int getWindSpeed();       /* Wind speed in tenths of a MPH. */
 	unsigned int getRainFall();        /* Rain fall ammount in Thousanths of an inch. */
-	unsigned int getRainFallElapsed(); /* Rain fall accumulation duration in minutes. */
 	void resetRainFall();
 	
 private:
@@ -34,7 +33,6 @@ private:
 	volatile unsigned long windSpeedCount;
 	
 	volatile unsigned long rainFallCount;
-	volatile unsigned long rainFallEpoch;
 	
 	unsigned char _direction_pin;
 	unsigned char _anemometer_pin;
